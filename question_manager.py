@@ -19,6 +19,18 @@ def get_next_id(questions):
 	return f"Q{highest_number + 1:05d}"
 
 
+def get_existing_values(questions, column):
+	if column not in questions.columns:
+		return []
+
+	values = {
+		str(value).strip()
+		for value in questions[column].dropna()
+		if str(value).strip()
+	}
+	return sorted(values)
+
+
 def show_add_question(questions):
 	st.header("Add Question")
 	st.write("Preview a question before adding it to the repository.")
@@ -28,6 +40,20 @@ def show_add_question(questions):
 		["Single Correct", "Multiple Correct", "Integer"],
 		key="new_question_type",
 	)
+
+	subject_options = ["+ Add New Subject"] + get_existing_values(questions, "Subject")
+	selected_subject = st.selectbox("Subject", subject_options, key="new_subject_choice")
+	if selected_subject == "+ Add New Subject":
+		subject = st.text_input("New Subject", key="new_subject_value")
+	else:
+		subject = selected_subject
+
+	exam_options = ["+ Add New Exam"] + get_existing_values(questions, "Exam")
+	selected_exam = st.selectbox("Exam", exam_options, key="new_exam_choice")
+	if selected_exam == "+ Add New Exam":
+		exam = st.text_input("New Exam", key="new_exam_value")
+	else:
+		exam = selected_exam
 
 	with st.form("add_question_form"):
 		question_text = st.text_area("Question")
@@ -49,10 +75,8 @@ def show_add_question(questions):
 		else:
 			answer_value = st.number_input("Answer", step=1, format="%d")
 
-		subject = st.text_input("Subject")
 		topic = st.text_input("Topic")
 		difficulty = st.text_input("Difficulty")
-		exam = st.text_input("Exam")
 		explanation = st.text_area("Explanation")
 		preview_clicked = st.form_submit_button("Preview Question")
 
@@ -82,6 +106,10 @@ def show_add_question(questions):
 				int(answer_value)
 			except (TypeError, ValueError):
 				errors.append("Integer answer must be a valid integer.")
+		if not subject.strip():
+			errors.append("Subject cannot be empty.")
+		if not exam.strip():
+			errors.append("Exam cannot be empty.")
 		if not explanation.strip():
 			errors.append("Explanation cannot be empty.")
 
@@ -98,10 +126,10 @@ def show_add_question(questions):
 				"Option D": option_d,
 				"Answer": answer_value,
 				"Question Type": question_type,
-				"Subject": subject,
+				"Subject": subject.strip(),
 				"Topic": topic,
 				"Difficulty": difficulty,
-				"Exam": exam,
+				"Exam": exam.strip(),
 				"Explanation": explanation,
 			}
 			st.session_state.question_preview = preview

@@ -2,6 +2,36 @@ import streamlit as st
 
 
 QUIZ_LENGTH = 10
+SUPPORTED_QUESTION_TYPES = {"Single Correct", "Multiple Correct", "Integer"}
+
+
+def get_available_subjects(questions):
+	if "Subject" not in questions.columns:
+		return []
+
+	values = {
+		str(value).strip()
+		for value in questions["Subject"].dropna()
+		if str(value).strip()
+	}
+	return sorted(values)
+
+
+def filter_questions_by_subjects(questions, subjects):
+	if "Subject" not in questions.columns or not subjects:
+		return questions.iloc[0:0].copy()
+
+	selected_subjects = {str(subject).strip() for subject in subjects}
+	filtered = questions[
+		questions["Subject"].fillna("").astype(str).str.strip().isin(selected_subjects)
+	]
+	if "Question Type" in filtered.columns:
+		filtered = filtered[
+			filtered["Question Type"].fillna("").astype(str).str.strip().isin(
+				SUPPORTED_QUESTION_TYPES
+			)
+		]
+	return filtered
 
 
 def check_single_correct(selected_letter, answer):
@@ -26,11 +56,30 @@ def check_integer(selected_number, answer):
 
 def reset_quiz(questions):
 	question_count = min(QUIZ_LENGTH, len(questions))
+	for key in list(st.session_state):
+		if key.startswith(("single_answer_", "option_", "integer_answer_")):
+			del st.session_state[key]
 	st.session_state.quiz_questions = questions.sample(n=question_count).reset_index(drop=True)
 	st.session_state.current_question = 0
 	st.session_state.score = 0
 	st.session_state.submitted = False
 	st.session_state.quiz_finished = False
+	st.session_state.last_answer_correct = False
+
+
+def clear_quiz_state():
+	for key in [
+		"quiz_questions",
+		"quiz_filter_subjects",
+		"quiz_active",
+		"current_question",
+		"score",
+		"submitted",
+		"quiz_finished",
+		"last_answer_correct",
+		"quiz_subject_options",
+	]:
+		st.session_state.pop(key, None)
 
 
 def show_correct_answer(question):
@@ -46,11 +95,41 @@ def show_correct_answer(question):
 
 
 def show_quiz(questions):
-	if "quiz_questions" not in st.session_state:
-		reset_quiz(questions)
+	available_subjects = get_available_subjects(questions)
+	if not st.session_state.get("quiz_active", False):
+		if not available_subjects:
+			st.warning("No non-empty subjects are available, so the quiz cannot be filtered yet.")
+			return
 
-	if len(questions) < QUIZ_LENGTH:
-		st.info(f"The sheet has fewer than {QUIZ_LENGTH} questions. Using all {len(questions)} questions.")
+		subject_labels = {
+			subject: f"{subject} ({(questions['Subject'].fillna('').astype(str).str.strip() == subject).sum()})"
+			for subject in available_subjects
+		}
+		selected_labels = st.multiselect(
+			"Select subjects",
+			[subject_labels[subject] for subject in available_subjects],
+			key="quiz_subject_options",
+		)
+		if st.button("Start Quiz", key="start_quiz"):
+			selected_subjects = [
+				subject for subject in available_subjects if subject_labels[subject] in selected_labels
+			]
+			if not selected_subjects:
+				st.error("Select at least one subject before starting the quiz.")
+				return
+			filtered_questions = filter_questions_by_subjects(questions, selected_subjects)
+			if filtered_questions.empty:
+				st.error("The selected subjects have no valid questions to quiz.")
+				return
+			st.session_state.quiz_filter_subjects = selected_subjects
+			reset_quiz(filtered_questions)
+			st.session_state.quiz_active = True
+			st.rerun()
+		return
+
+	quiz_questions = st.session_state.quiz_questions
+	if len(quiz_questions) < QUIZ_LENGTH:
+		st.info(f"Using all {len(quiz_questions)} available questions for this selection.")
 
 	if st.session_state.quiz_finished:
 		question_count = len(st.session_state.quiz_questions)
@@ -59,7 +138,13 @@ def show_quiz(questions):
 		accuracy = st.session_state.score / question_count * 100 if question_count else 0
 		st.write(f"Accuracy: {accuracy:.0f}%")
 		if st.button("Restart Quiz"):
-			reset_quiz(questions)
+			filtered_questions = filter_questions_by_subjects(
+				questions, st.session_state.get("quiz_filter_subjects", [])
+			)
+			if filtered_questions.empty:
+				st.error("The selected subjects no longer have valid questions.")
+				return
+			reset_quiz(filtered_questions)
 			st.rerun()
 		return
 
