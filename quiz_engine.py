@@ -54,8 +54,10 @@ def check_integer(selected_number, answer):
 		return False
 
 
-def reset_quiz(questions):
-	question_count = min(QUIZ_LENGTH, len(questions))
+def reset_quiz(questions, requested_count=None):
+	if requested_count is None:
+		requested_count = QUIZ_LENGTH
+	question_count = min(requested_count, QUIZ_LENGTH, len(questions))
 	for key in list(st.session_state):
 		if key.startswith(("single_answer_", "option_", "integer_answer_")):
 			del st.session_state[key]
@@ -78,6 +80,7 @@ def clear_quiz_state():
 		"quiz_finished",
 		"last_answer_correct",
 		"quiz_subject_options",
+		"quiz_question_count",
 	]:
 		st.session_state.pop(key, None)
 
@@ -110,19 +113,29 @@ def show_quiz(questions):
 			[subject_labels[subject] for subject in available_subjects],
 			key="quiz_subject_options",
 		)
+		selected_subjects = [
+			subject for subject in available_subjects if subject_labels[subject] in selected_labels
+		]
+		filtered_questions = filter_questions_by_subjects(questions, selected_subjects)
+		max_question_count = min(QUIZ_LENGTH, len(filtered_questions))
+		question_count_options = list(range(1, max_question_count + 1)) or [1]
+		requested_count = st.selectbox(
+			"Number of questions",
+			question_count_options,
+			index=len(question_count_options) - 1,
+			key="quiz_question_count",
+			disabled=not selected_subjects,
+		)
 		if st.button("Start Quiz", key="start_quiz"):
-			selected_subjects = [
-				subject for subject in available_subjects if subject_labels[subject] in selected_labels
-			]
 			if not selected_subjects:
 				st.error("Select at least one subject before starting the quiz.")
 				return
-			filtered_questions = filter_questions_by_subjects(questions, selected_subjects)
 			if filtered_questions.empty:
 				st.error("The selected subjects have no valid questions to quiz.")
 				return
 			st.session_state.quiz_filter_subjects = selected_subjects
-			reset_quiz(filtered_questions)
+			st.session_state.quiz_question_count = min(requested_count, len(filtered_questions))
+			reset_quiz(filtered_questions, st.session_state.quiz_question_count)
 			st.session_state.quiz_active = True
 			st.rerun()
 		return
@@ -144,7 +157,10 @@ def show_quiz(questions):
 			if filtered_questions.empty:
 				st.error("The selected subjects no longer have valid questions.")
 				return
-			reset_quiz(filtered_questions)
+			reset_quiz(
+				filtered_questions,
+				st.session_state.get("quiz_question_count", QUIZ_LENGTH),
+			)
 			st.rerun()
 		return
 
