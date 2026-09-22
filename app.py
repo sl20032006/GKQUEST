@@ -15,11 +15,11 @@ if "page" not in st.session_state:
 
 
 st.title("Quiz Ecosystem")
-st.write("A personal quiz platform for UPSC, NDA and GK.")
+st.write("A personal quiz platform2 for UPSC, NDA and GK.")
 
 if st.session_state.page == "Main Menu":
 	st.header("Main Menu")
-	st.write("Choose what you would like to do:")
+	st.write("Choose what you would like to do2:")
 	quiz_clicked = st.button("GK Quest", use_container_width=True, key="main_menu_quiz")
 	add_clicked = st.button("Add a Question", use_container_width=True, key="main_menu_add")
 	if quiz_clicked:
