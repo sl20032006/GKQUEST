@@ -134,8 +134,7 @@ def show_quiz(questions):
 				st.error("The selected subjects have no valid questions to quiz.")
 				return
 			st.session_state.quiz_filter_subjects = selected_subjects
-			st.session_state.quiz_question_count = min(requested_count, len(filtered_questions))
-			reset_quiz(filtered_questions, st.session_state.quiz_question_count)
+			reset_quiz(filtered_questions, requested_count)
 			st.session_state.quiz_active = True
 			st.rerun()
 		return
